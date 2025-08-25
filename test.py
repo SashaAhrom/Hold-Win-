@@ -1,5 +1,7 @@
-from copy import deepcopy
-import random
+# CHANGE: It is better to remove unused imports
+# Comment: The module random is suitable for prototyping, modeling, testing but for real production slot / gambling games, it’s not appropriate.
+import random 
+from typing import Any 
 
 # Define constants for symbols
 SYMBOL_EMPTY = 0
@@ -7,35 +9,35 @@ SYMBOL_REGULAR = 1
 SYMBOL_BONUS = 2
 
 # Initial random source generation
-def generate_initial_src(size=100000):
+def generate_initial_src(size: int=100000) -> list[int]:
     random.seed()
     return [random.randint(0, 100) for _ in range(size)]
 
 
 class BaseModel:
     @classmethod
-    def blank(cls):
+    def blank(cls) -> dict[str, Any]:
         return {}
 
     @classmethod
-    def spins(cls):
+    def spins(cls) -> dict[str, int]:
         return {'round_win': 0}
 
     @classmethod
-    def bonus(cls):
+    def bonus(cls) -> dict[str, int]:
         return {'round_win': 0, 'raunds_left': 3}
 
 
 class BaseGame:
-    def __init__(self):
+    def __init__(self) -> None:
         self.ctx = {}
         self.cur = {}
         self.src_index = 0
-        self.src = getattr(self, 'custom_src', None) or generate_initial_src()
+        self.src = generate_initial_src()
         self.setup_states()
         self.current_state = 'init'
 
-    def setup_states(self):
+    def setup_states(self) -> None:
         self.states = {
             'init': self.handler_init,
             'spin': self.handler_spin,
@@ -43,7 +45,7 @@ class BaseGame:
             'bonus': self.handler_bonus,
         }
 
-    def run(self, num_spins=1000):
+    def run(self, num_spins: int=1000) -> None:
         total_spins = 0
         total_bonus_games = 0
         total_win = 0
@@ -60,6 +62,7 @@ class BaseGame:
             if self.cur.get('bonus_triggered'):
                 total_bonus_games += 1
                 self.handler_bonus_init()
+                # CHANGE: use > 0 instead of != 0 better in our case because it stops working when the value is negative
                 while self.cur['raunds_left'] > 0:
                     self.handler_bonus()
                 total_win += self.cur.get('bonus_total_win', 0)
@@ -69,7 +72,7 @@ class BaseGame:
         print(f"Final balance: {self.cur['balance']}")
         print(f"Total win accumulated: {total_win}")
 
-    def get_next_random(self):
+    def get_next_random(self) -> int:
         value = self.src[self.src_index % len(self.src)]
         self.src_index += 1
         return value
@@ -80,11 +83,11 @@ class GameModel(BaseModel):
 
 
 class Game(BaseGame):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.model_cls = BaseModel
+        self.model_cls = GameModel
 
-    def handler_init(self):
+    def handler_init(self) -> None:
         self.ctx = self.model_cls.blank()
         self.ctx['spins'] = self.model_cls.spins()
         self.ctx['bonus'] = self.model_cls.bonus()
@@ -94,7 +97,7 @@ class Game(BaseGame):
         self.cur['spin_win'] = 0
         self.cur['bonus_total_win'] = 0
 
-    def handler_spin(self):
+    def handler_spin(self) -> None:
         # Reset spin win
         self.cur['spin_win'] = 0
         self.cur['board'] = [SYMBOL_REGULAR for _ in range(5)]
@@ -109,13 +112,14 @@ class Game(BaseGame):
             self.cur['spin_win'] = win
             self.cur['bonus_triggered'] = False
 
-    def handler_bonus_init(self):
+    def handler_bonus_init(self) -> None:
         self.ctx['bonus'] = self.model_cls.bonus()
         self.cur['raunds_left'] = self.ctx['bonus']['raunds_left']
         self.cur['bonus_simbols'] = []
         self.cur['bonus_total_win'] = 0
 
-    def handler_bonus(self):
+    def handler_bonus(self) -> None:
+        # CHANGE: removed the pre-decrement here to avoid consuming a round before we know the outcome
         new_symbol_chance = self.get_next_random()
         if new_symbol_chance < 50:  # 50% chance to get a new bonus symbol
             new_value = self.get_next_random() % 10 + 1
@@ -123,7 +127,7 @@ class Game(BaseGame):
             self.cur['raunds_left'] = self.ctx['bonus']['raunds_left']
         else:
             self.cur['raunds_left'] -= 1
-
+        # CHANGE: use <= 0 for reliability in case of negative values
         if self.cur['raunds_left'] <= 0:
             total_bonus_win = sum(self.cur['bonus_simbols'])
             self.cur['balance'] += total_bonus_win
